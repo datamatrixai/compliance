@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DataMatrix.AI – Regulatory Reporting Intelligence (Prototype)</title>
+<style>
+:root{--n:#232F6F;--n2:#2C3B87;--g:#D7A835;--bg:#F4F6FA;--c:#fff;--t:#1d2540;--m:#697389;--ok:#388764;--er:#B44646;--wa:#c98a12;--ln:#dde2ef}
+@media(prefers-color-scheme:dark){:root{--bg:#161b3a;--c:#1f2650;--t:#eef1fb;--m:#a5aed0;--ln:#38427a}}
+*{box-sizing:border-box}body{margin:0;font-family:Calibri,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--t)}
+header{background:var(--n);color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header b{letter-spacing:3px;color:var(--g);font-size:12px}header h1{margin:2px 0 0;font-size:20px;font-family:Cambria,serif}
+.tag{font-size:11px;border:1px solid var(--g);color:var(--g);padding:3px 8px;border-radius:12px}
+main{display:grid;grid-template-columns:1fr 330px;gap:16px;padding:16px 24px;max-width:1400px;margin:auto}
+@media(max-width:1000px){main{grid-template-columns:1fr}}
+.card{background:var(--c);border:1px solid var(--ln);border-radius:12px;padding:14px;margin-bottom:14px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.bar label{font-size:11px;color:var(--m);display:block;font-weight:700;text-transform:uppercase}
+select,button,input[type=file]{font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--ln);background:var(--c);color:var(--t)}
+button{cursor:pointer}button.p{background:var(--n2);color:#fff;border:0}button.p:hover{background:var(--n)}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;font-size:11px;text-transform:uppercase;color:var(--m);padding:6px;border-bottom:2px solid var(--ln)}
+td{padding:8px 6px;border-bottom:1px solid var(--ln);vertical-align:top}td select{width:100%;max-width:340px}
+.chip{display:inline-block;padding:2px 8px;border-radius:10px;font-weight:700;font-size:12px;color:#fff}
+.h{background:var(--ok)}.mm{background:var(--wa)}.l{background:var(--er)}
+.why{font-size:12px;color:var(--m);margin-top:4px}.src{font-weight:600}
+.miss{color:var(--er);font-weight:600}
+.gauge{width:150px;height:150px;border-radius:50%;margin:6px auto;display:grid;place-items:center}
+.gauge div{width:112px;height:112px;border-radius:50%;background:var(--c);display:grid;place-items:center;text-align:center;font-size:34px;font-weight:800;font-family:Cambria,serif}
+.gauge small{display:block;font-size:11px;font-weight:400;color:var(--m);font-family:Calibri}
+.sig{display:flex;justify-content:space-between;font-size:12px;margin:5px 0}.sig i{display:block;height:5px;border-radius:3px;background:var(--g);margin-top:2px}
+.v{font-size:12px;padding:5px 0;border-bottom:1px solid var(--ln)}.v b{font-size:10px;padding:1px 6px;border-radius:6px;color:#fff;margin-right:6px}
+.pass{background:var(--ok)}.warn{background:var(--wa)}.fail{background:var(--er)}
+.gate{padding:10px;border-radius:8px;color:#fff;font-weight:700;text-align:center;margin-top:8px}
+h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--g)}
+.note{font-size:11px;color:var(--m)}
+</style></head><body>
+<header><div><b>DATAMATRIX.AI</b><h1>Regulatory Reporting Intelligence Layer</h1></div><span class="tag">PROTOTYPE · synthetic data only</span></header>
+<main><section>
+<div class="card"><div class="bar">
+<div><label>1 · Report template</label><select id="tpl"></select></div>
+<div><label>or upload your own (CSV: header row = field names)</label><input type="file" id="up" accept=".csv,.txt"></div>
+<div><label>2 · Customer</label><select id="cust"></select></div>
+<div><label>Reporting period end</label><select id="per"><option>2026-09-30</option></select></div>
+<button class="p" id="run">Auto-populate</button></div>
+<p class="note" id="tinfo"></p></div>
+<div class="card"><table><thead><tr><th>Report field</th><th>Populated value (change to review)</th><th>Confidence</th><th>Why matched · source</th><th>Reviewed</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="bar"><button class="p" id="csv">Export report (CSV)</button><button id="json">Export evidence pack (JSON)</button></div>
+<p class="note">Prototype logic runs entirely in your browser. Sources, values and rules are synthetic samples to illustrate the workflow; production connects to core banking, CRM, KYC and document stores.</p>
+</section><aside>
+<div class="card"><h3>Report assurance</h3><div class="gauge" id="gauge"><div id="score"></div></div><div id="sigs"></div><div class="gate" id="gate"></div></div>
+<div class="card"><h3>Validation</h3><div id="vals"></div></div>
+<div class="card"><h3>Audit trail</h3><div id="aud" class="note">No changes yet.</div></div>
+</aside></main>
+<script>
+const P='2026-09-30',$=id=>document.getElementById(id);
+const C={name:{l:'Customer name',st:1,syn:['name']},pan:{l:'PAN',st:1,syn:['pan','tax id']},dob:{l:'Date of birth',st:1,syn:['dob','birth']},
+mobile:{l:'Mobile number',syn:['mobile','phone','contact']},address:{l:'Address',syn:['address','residence','location']},opendate:{l:'Account opening date',st:1,syn:['open','since']},
+acctype:{l:'Account type',st:1,syn:['account type','product','scheme']},balance:{l:'Outstanding balance (INR)',syn:['balance','outstanding','exposure']},
+income:{l:'Annual income (INR)',syn:['income','salary','turnover']},risk:{l:'Risk category',st:1,syn:['risk','category']}};
+const T={t1:{n:'RBI-style Quarterly KYC & Exposure Return',f:['name','pan','dob','mobile','address','opendate','acctype','balance','income','risk']},
+t2:{n:'Regulator Data Request – Customer Contact & Address',f:['name','pan','mobile','address']}};
+const c=(v,src,d,a,m,note)=>({v,src,d,a,m,note:note||''});
+const K={
+C1001:{n:'C1001 · Rajesh Sharma (healthy record)',x:{
+name:[c('Rajesh Kumar Sharma','KYC master','2019-03-12',.95,.98),c('Rajesh K Sharma','Core banking','2024-06-01',.8,.9)],
+pan:[c('ABCPS1234K','KYC master','2019-03-12',.95,1)],
+dob:[c('1984-07-21','KYC master','2019-03-12',.95,1),c('1984-07-12','Loan application 2021','2021-02-01',.6,.9,'Conflicts with KYC master')],
+mobile:[c('9876543210','CRM','2026-05-10',.85,.95),c('9876500011','Core banking','2021-04-02',.8,.9,'Older number')],
+address:[c('12 Example Road, Bengaluru 560001','Utility bill (Aug 2026)','2026-08-20',.7,.85,'Latest proof of current residence'),c('Plot 5, Gandhi Nagar, Bhubaneswar 751001','KYC master – permanent address','2019-03-12',.95,.75),c('Shop 4, Market Complex, Cuttack 753001','Business registration – shop/factory','2022-01-15',.75,.6),c('44 Old Lane, Mysuru 570001','Previous communication address','2017-05-01',.5,.7,'Historical')],
+opendate:[c('2019-03-15','Core banking','2019-03-15',.98,1)],acctype:[c('Savings','Core banking','2019-03-15',.98,1)],
+balance:[c('1250000.50','Core banking EOD 28-Sep','2026-09-28',.98,1),c('1198000','Statement snapshot Q2','2026-06-30',.7,.8,'Prior quarter')],
+income:[c('1800000','ITR FY2025','2025-07-31',.9,.9),c('1500000','Loan application 2021','2021-02-01',.6,.85)],
+risk:[c('Medium','AML risk engine','2026-08-01',.9,1)]}},
+C2002:{n:'C2002 · Anita Verma (data-quality issues)',x:{
+name:[c('Anita Verma','KYC master','2020-08-01',.95,1)],
+pan:[c('AAAPL12345','KYC master','2020-08-01',.95,1,'Format looks wrong')],
+dob:[c('2010-01-05','CRM','2023-01-01',.85,.95)],
+mobile:[c('98765432','CRM','2023-01-01',.85,.95,'Only 8 digits')],
+address:[c('7 Lake View, Pune 411001','Bank statement mailing address','2026-07-01',.7,.85),c('Flat 9, Rose Apts, Nagpur','KYC master','2020-08-01',.95,.75,'No pincode')],
+opendate:[c('2026-11-02','Core banking','2026-09-01',.98,1,'Future date')],acctype:[c('Current','Core banking','2020-08-05',.98,1)],
+balance:[c('-52000','Core banking EOD 28-Sep','2026-09-28',.98,1)],risk:[c('High','AML risk engine','2026-08-01',.9,1)]}}};
+let S={f:[],sel:{},rev:{},aud:[],cid:'C1001'};
+const yrs=d=>(new Date(P)-new Date(d))/31557600000;
+const fr=(k,x)=>C[k].st?1:Math.max(.3,1-yrs(x.d)/6);
+const sc=(k,x)=>.4*x.m+.3*x.a+.3*fr(k,x);
+const ranked=(k)=>{const a=(K[S.cid].x[k]||[]).map((x,i)=>({x,i,s:sc(k,x)}));return a.sort((p,q)=>q.s-p.s)};
+function load(fs){S.f=fs;S.sel={};S.rev={};S.aud=[];S.cid=$('cust').value;
+fs.forEach(f=>{if(f.k){const r=ranked(f.k);if(r.length)S.sel[f.k]=r[0].i}});render()}
+function pick(k){const r=ranked(k);return S.sel[k]!=null?r.find(o=>o.i==S.sel[k]):null}
+function val(){const o=[],g=k=>{const p=pick(k);return p?p.x.v:''};
+S.f.forEach(f=>{if(!f.k){o.push([f.l,'fail','Mandatory field – no source identified. Needs new data sourcing.']);return}
+const v=g(f.k);if(!v){o.push([f.l,'fail','Mandatory value missing']);return}
+const R={pan:[/^[A-Z]{5}[0-9]{4}[A-Z]$/,'PAN must match AAAAA9999A'],mobile:[/^[6-9]\d{9}$/,'Mobile must be 10 digits starting 6-9'],dob:[/^\d{4}-\d{2}-\d{2}$/,'DOB format YYYY-MM-DD'],
+address:[/\b\d{6}\b/,'Address should carry 6-digit pincode'],balance:[/^-?\d+(\.\d+)?$/,'Numeric balance expected']}[f.k];
+if(R&&!R[0].test(v)){o.push([f.l,f.k=='address'?'warn':'fail',R[1]]);}else o.push([f.l,'pass','Structural check OK']);
+if(f.k=='balance'&&+v<0)o.push([f.l,'warn','Negative balance – confirm overdrawn account']);
+const r=ranked(f.k);if(r.length>1&&r[0].x.v!=r[1].x.v&&f.k!='address'&&Math.abs(r[0].s-r[1].s)<.25)o.push([f.l,'warn','Conflicting sources – '+r.length+' values with close scores']);});
+const age=g('dob')?yrs(g('dob')):null;
+if(age!==null){o.push(['DOB vs period',age<18?'fail':'pass',age<18?'Customer under 18 for a standard account':'Age '+Math.floor(age)+' – consistent'])}
+if(g('opendate')){o.push(['Account open date',g('opendate')>P?'fail':'pass',g('opendate')>P?'Opening date after reporting period':'Within reporting period'])}
+if(g('risk')=='High'&&S.f.some(f=>f.k=='income')&&!g('income'))o.push(['Risk vs income','warn','High-risk customer without income evidence']);
+return o}
+function render(){const tb=$('rows');tb.innerHTML='';
+S.f.forEach(f=>{const tr=document.createElement('tr');
+if(!f.k){tr.innerHTML=`<td><b>${f.l}</b></td><td class="miss" colspan="3">No matching source found – flagged for data sourcing (new field)</td><td></td>`;tb.append(tr);return}
+const r=ranked(f.k);if(!r.length){tr.innerHTML=`<td><b>${f.l}</b></td><td class="miss" colspan="3">No candidate in available systems</td><td></td>`;tb.append(tr);return}
+const p=pick(f.k),s=Math.round(p.s*100),cl=s>=85?'h':s>=65?'mm':'l';
+const ops=r.map(o=>`<option value="${o.i}" ${o.i==p.i?'selected':''}>${o.x.v} — ${o.x.src} (${Math.round(o.s*100)}%)</option>`).join('');
+tr.innerHTML=`<td><b>${f.l}</b></td><td><select data-k="${f.k}">${ops}</select><div class="why">${r.length-1} alternative${r.length>2?'s':''} available</div></td>
+<td><span class="chip ${cl}">${s}%</span></td><td><span class="src">${p.x.src}</span><div class="why">Match ${Math.round(p.x.m*100)}% · authority ${Math.round(p.x.a*100)}% · freshness ${Math.round(fr(f.k,p.x)*100)}%${p.x.note?' · '+p.x.note:''}${p.i!=r[0].i?' · <b>manually changed</b>':''}</div></td>
+<td><input type="checkbox" data-r="${f.k}" ${S.rev[f.k]?'checked':''}></td>`;tb.append(tr)});
+tb.querySelectorAll('select').forEach(e=>e.onchange=()=>{const k=e.dataset.k,o=pick(k).x;S.sel[k]=+e.value;const n=pick(k).x;S.aud.push(`${new Date().toLocaleTimeString()} · ${C[k].l}: "${o.v}" → "${n.v}" (${n.src})`);S.rev[k]=true;render()});
+tb.querySelectorAll('[data-r]').forEach(e=>e.onchange=()=>{S.rev[e.dataset.r]=e.checked;render()});
+const vs=val();$('vals').innerHTML=vs.map(v=>`<div class="v"><b class="${v[1]}">${v[1].toUpperCase()}</b><strong>${v[0]}</strong> – ${v[2]}</div>`).join('');
+const fl=S.f.filter(f=>f.k&&pick(f.k)),n=S.f.length||1,avg=fn=>fl.length?fl.reduce((a,f)=>a+fn(f),0)/n:0;
+const sig={'Source authority':avg(f=>pick(f.k).x.a),'Match strength':avg(f=>pick(f.k).x.m),'Freshness':avg(f=>fr(f.k,pick(f.k).x)),
+'Consistency':S.f.filter(f=>f.k&&ranked(f.k).length&&!vs.some(v=>v[0]==f.l&&v[2].startsWith('Conflicting'))).length/n,
+'Validation pass':vs.filter(v=>v[1]=='pass').length/(vs.length||1),'Human review':S.f.filter(f=>f.k&&S.rev[f.k]).length/n};
+const w=[.2,.2,.15,.15,.2,.1],tot=Math.round(100*Object.values(sig).reduce((a,x,i)=>a+x*w[i],0));
+const col=tot>=85?'var(--ok)':tot>=65?'var(--wa)':'var(--er)';
+$('gauge').style.background=`conic-gradient(${col} ${tot*3.6}deg,var(--ln) 0)`;$('score').innerHTML=`${tot}<small>${tot>=85?'High':tot>=65?'Medium':'Low'} assurance</small>`;
+$('sigs').innerHTML=Object.entries(sig).map(([k,v])=>`<div><div class="sig"><span>${k}</span><b>${Math.round(v*100)}%</b></div><i style="width:${v*100}%"></i></div>`).join('');
+const fails=vs.filter(v=>v[1]=='fail').length,warns=vs.filter(v=>v[1]=='warn').length;
+const g=$('gate');g.textContent=fails?`BLOCK – ${fails} failed check(s)`:warns?`PASS WITH REVIEW – ${warns} warning(s)`:'PASS – ready for sign-off';g.style.background=fails?'var(--er)':warns?'var(--wa)':'var(--ok)';
+$('aud').innerHTML=S.aud.length?S.aud.join('<br>'):'No changes yet.';S.tot=tot;S.vs=vs}
+function out(){return S.f.map(f=>{const p=f.k&&ranked(f.k).length?pick(f.k):null;return{field:f.l,value:p?p.x.v:'',source:p?p.x.src:'NO SOURCE',confidence:p?Math.round(p.s*100):0,reviewed:!!S.rev[f.k],alternatives:f.k?ranked(f.k).filter(o=>!p||o.i!=p.i).map(o=>({value:o.x.v,source:o.x.src})):[]}})}
+function dl(n,t,m){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:m}));a.download=n;a.click()}
+$('csv').onclick=()=>dl('report.csv','Field,Value,Source,Confidence,Reviewed\n'+out().map(r=>[r.field,r.value,r.source,r.confidence,r.reviewed].map(x=>`"${x}"`).join(',')).join('\n'),'text/csv');
+$('json').onclick=()=>dl('evidence_pack.json',JSON.stringify({customer:S.cid,period:P,assurance:S.tot,validations:S.vs,fields:out(),audit:S.aud},null,2),'application/json');
+$('tpl').innerHTML=Object.entries(T).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join('');
+$('cust').innerHTML=Object.entries(K).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join('');
+const tf=()=>T[$('tpl').value].f.map(k=>({k,l:C[k].l}));
+$('run').onclick=()=>{$('tinfo').textContent=T[$('tpl').value].f.length+' fields understood from template.';load(tf())};
+$('up').onchange=e=>{const r=new FileReader();r.onload=()=>{const h=r.result.split(/\r?\n/)[0].split(',').map(s=>s.trim().replace(/"/g,'')).filter(Boolean);
+const fs=h.map(l=>{const k=Object.keys(C).find(k=>C[k].syn.some(s=>l.toLowerCase().includes(s)));return{k,l}});
+$('tinfo').textContent=`Uploaded template: ${fs.length} fields read, ${fs.filter(f=>f.k).length} matched to enterprise data, ${fs.filter(f=>!f.k).length} need new sourcing.`;load(fs)};r.readAsText(e.target.files[0])};
+$('cust').onchange=()=>load(S.f.length?S.f:tf());
+$('run').click();
+</script></body></html>
